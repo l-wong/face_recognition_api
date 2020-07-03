@@ -4,100 +4,93 @@ const bcrypt = require('bcrypt-nodejs');
 const User = require("./models/User");
 const mongoose = require("mongoose");
 const cors = require('cors');
+const app = express();
 
-const connectDB = async () => {
-  try {
-    await mongoose.connect(
-      "mongodb+srv://root:admin@cluster0-zule9.mongodb.net/test?retryWrites=true&w=majority",
-      {
-        useNewUrlParser: true,
-        useCreateIndex: true,
-        useUnifiedTopology: true,
-        useFindAndModify: false
-      }
-    );
-
-    console.log("db connected");
-  } catch (error) {
-    console.log(error.message);
-  }
-};
-connectDB();
-
-
-//app.use(bodyParser.json());
+app.use(bodyParser.json());
 app.use(cors());
-app.use(express.json({ extended: false }));
 
-app.post("/signin", async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json("incorrect form submission");
-  }
-  try {
-    let user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ errors: [{ msg: "Invalid credentials" }] });
+const database = {
+  users: [
+    {
+      id: '123',
+      name: 'John',
+      email: 'john@email.com',
+      password: 'cookies',
+      entries: 0,
+      joined: new Date()
+    },
+    {
+      id: '124',
+      name: 'Sally',
+      email: 'sally@email.com',
+      password: 'bananas',
+      entries: 0,
+      joined: new Date()
     }
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ errors: [{ msg: "Invalid credentials" }] });
-    }
-    res.json(user);
-  } catch (error) {
-    res.send(error.message);
-  }
-});
+  ]
+}
 
-app.post("/register", async (req, res) => {
-  let { email, name, password } = req.body;
-  if (!email || !password || !name) {
-    return res.status(400).json("incorrect form submission");
-  }
-  try {
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ errors: [{ msg: "user already exists" }] });
-    }
-    password = await bcrypt.hash(password, 10);
-    user = new User({
-      name,
-      email,
-      password
-    });
-    await user.save();
-    res.send(user);
-  } catch (error) {
-    res.status(500).json(error.message);
-  }
-});
+app.get('/', (req, res)=> {
+  res.send(database.users);
+})
 
-app.put("/image", async (req, res) => {
-  const { id } = req.body;
-  try {
-    await User.findOneAndUpdate({ _id: id }, { $inc: { entries: 1 } });
-    let user = await User.findById({ _id: id }); //this returns the updated state
-    return res.send({ entries: user.entries });
-  } catch (e) {
-    console.log(e);
-    res.status(500).json({ errors: [{ msg: "could'nt fetch rank" }] });
+app.post('/signin', (req, res) => {
+  if (req.body.email === database.users[0].email && req.body.password === database.users[0].password) {
+    res.json(database.users[0]);
   }
-});
-app.post("/delete", async (req, res) => {
-  const { id } = req.body;
-  try {
-    await User.deleteOne({ _id: id });
-    // let user = await User.findById({ _id: id }); //this returns the updated state
-    return res.status(200).json({ msg: " user deleted succesfully" });
-  } catch (e) {
-    console.log(e);
-    res.status(500).json({ errors: [{ msg: "could'nt delete user" }] });
+  else {
+    res.status(400).json('error');
   }
-});
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`server running on port ${PORT}`);
-});
+})
+
+app.post('/register', (req, res) => {
+  const {email, name, password } = req.body;
+  bcrypt.hash(password, null, null, function(err, hash) {
+    console.log(hash);
+  });
+  database.users.push({
+    id: '125',
+    name: name,
+    email: email,
+    entries: 0,
+    joined: new Date()
+  })
+  res.json(database.users[database.users.length-1]);
+})
+
+app.get('/profile/:id', (req,res) => {
+  const {id} = req.params;
+  const found = false;
+  database.users.forEach(user => {
+    if (user.id === id){
+      found = true;
+      return res.json(user);
+    }
+  })
+  if (!found) {
+    res.status(400).json('not found');
+  }
+})
+
+app.put('/image', (req, res) => {
+  const {id} = req.body;
+  const found = false;
+  database.users.forEach(user => {
+    if (user.id === id){
+      found = true;
+      user.entries++
+      return res.json(user.entries);
+    }
+  })
+  if (!found) {
+    res.status(400).json('not found');
+  }
+})
+
+app.listen(3000, ()=> {
+  console.log('app is running on port 3000');
+})
+
 
 
 /*
